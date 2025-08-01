@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบทะเบียนสื่อ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f0f5ff;
+        }
+        .nav-item.active {
+            background-color: #1e40af;
+            color: white;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @font-face {
+            font-family: 'Sarabun';
+            src: url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap');
+        }
+        .subject-header {
+            background-color: #e0e7ff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center">
+                    <img src="https://img2.pic.in.th/pic/LOGO-397da9cb945d86ea.png" alt="Logo" class="h-16 mr-4">
+                    <h1 class="text-2xl font-bold text-blue-800">ระบบทะเบียนสื่อ</h1>
+                </div>
+                <div class="text-sm text-gray-600">
+                    <div id="current-date"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="bg-blue-700 text-white">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-wrap">
+                    <button class="nav-item px-6 py-3 font-medium hover:bg-blue-800 active" data-target="dashboard">แดชบอร์ดทะเบียนสื่อ</button>
+                    <button class="nav-item px-6 py-3 font-medium hover:bg-blue-800" data-target="register">ลงทะเบียนสื่อ</button>
+                    <button class="nav-item px-6 py-3 font-medium hover:bg-blue-800" data-target="export">ส่งออกข้อมูล / พิมพ์รายงาน</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto px-4 py-6">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="page-section">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-bold text-blue-800 mb-4">ภาพรวมทะเบียนสื่อ</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-blue-100 rounded-lg p-4 shadow">
+                            <h3 class="text-lg font-semibold text-blue-800">สื่อทั้งหมดในระบบ</h3>
+                            <p class="text-3xl font-bold text-blue-600" id="total-media">0</p>
+                        </div>
+                        <div class="bg-green-100 rounded-lg p-4 shadow">
+                            <h3 class="text-lg font-semibold text-green-800">สื่อที่ลงทะเบียนในปีนี้</h3>
+                            <p class="text-3xl font-bold text-green-600" id="current-year-media">0</p>
+                        </div>
+                        <div class="bg-purple-100 rounded-lg p-4 shadow">
+                            <h3 class="text-lg font-semibold text-purple-800">กลุ่มสาระทั้งหมด</h3>
+                            <p class="text-3xl font-bold text-purple-600" id="total-subjects">0</p>
+                        </div>
+                        <div class="bg-amber-100 rounded-lg p-4 shadow">
+                            <h3 class="text-lg font-semibold text-amber-800">ครูผู้ผลิตสื่อ</h3>
+                            <p class="text-3xl font-bold text-amber-600" id="total-teachers">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-2">จำนวนสื่อรายเดือน</h3>
+                            <div class="h-64">
+                                <canvas id="monthly-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-2">จำนวนสื่อแยกตามกลุ่มสาระ</h3>
+                            <div class="h-64">
+                                <canvas id="subjects-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-2">จำนวนสื่อแยกตามปี</h3>
+                            <div class="h-64">
+                                <canvas id="yearly-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-blue-800 mb-4">รายการสื่อล่าสุด</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead>
+                                <tr class="bg-blue-100">
+                                    <th class="py-2 px-4 border-b text-left">ลำดับ</th>
+                                    <th class="py-2 px-4 border-b text-left">วันที่ผลิตสื่อ</th>
+                                    <th class="py-2 px-4 border-b text-left">รายการสื่อ/นวัตกรรม</th>
+                                    <th class="py-2 px-4 border-b text-left">ครูผู้ผลิตสื่อ</th>
+                                    <th class="py-2 px-4 border-b text-left">กลุ่มสาระ</th>
+                                    <th class="py-2 px-4 border-b text-left">ไฟล์</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-media-list">
+                                <!-- Data will be loaded here -->
+                                <tr>
+                                    <td colspan="6" class="py-4 text-center text-gray-500">กำลังโหลดข้อมูล...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Register Section -->
+            <section id="register" class="page-section hidden">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-blue-800 mb-4">ลงทะเบียนสื่อ</h2>
+                    
+                    <form id="media-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">วันที่ผลิตสื่อ</label>
+                                <input type="date" id="media-date" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">รายการสื่อ/นวัตกรรม</label>
+                                <input type="text" id="media-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ชื่อสื่อหรือนวัตกรรม">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">จำนวน</label>
+                                <input type="number" id="media-quantity" required min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="จำนวนชิ้น">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ไฟล์ลิงค์</label>
+                                <input type="url" id="media-link" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="URL ของไฟล์หรือเอกสาร">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ครูผู้ผลิตสื่อ</label>
+                                <input type="text" id="media-teacher" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ชื่อ-นามสกุล">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มสาระ</label>
+                                <select id="media-subject" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">เลือกกลุ่มสาระ</option>
+                                    <option value="ภาษาไทย">ภาษาไทย</option>
+                                    <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+                                    <option value="วิทยาศาสตร์และเทคโนโลยี">วิทยาศาสตร์และเทคโนโลยี</option>
+                                    <option value="สังคมศึกษา">สังคมศึกษา ศาสนาและวัฒนธรรม</option>
+                                    <option value="สุขศึกษาและพลศึกษา">สุขศึกษาและพลศึกษา</option>
+                                    <option value="ศิลปะ">ศิลปะ</option>
+                                    <option value="การงานอาชีพ">การงานอาชีพ</option>
+                                    <option value="ภาษาต่างประเทศ">ภาษาต่างประเทศ</option>
+                                    <option value="กิจกรรมพัฒนาผู้เรียน">กิจกรรมพัฒนาผู้เรียน</option>
+                                    <option value="อื่นๆ">อื่นๆ</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">หมายเหตุ</label>
+                            <textarea id="media-note" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" id="reset-form" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">ล้างข้อมูล</button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">บันทึกข้อมูล</button>
+                        </div>
+                    </form>
+                    
+                    <div id="loading-indicator" class="hidden mt-4">
+                        <div class="loader"></div>
+                        <p class="text-center text-blue-600">กำลังบันทึกข้อมูล...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Export Section -->
+            <section id="export" class="page-section hidden">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-blue-800 mb-4">ส่งออกข้อมูล / พิมพ์รายงาน</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วันที่เริ่มต้น</label>
+                            <input type="date" id="start-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วันที่สิ้นสุด</label>
+                            <input type="date" id="end-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มสาระ</label>
+                            <select id="filter-subject" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">ทั้งหมด</option>
+                                <option value="ภาษาไทย">ภาษาไทย</option>
+                                <option value="คณิตศาสตร์">คณิตศาสตร์</option>
+                                <option value="วิทยาศาสตร์และเทคโนโลยี">วิทยาศาสตร์และเทคโนโลยี</option>
+                                <option value="สังคมศึกษา">สังคมศึกษา ศาสนาและวัฒนธรรม</option>
+                                <option value="สุขศึกษาและพลศึกษา">สุขศึกษาและพลศึกษา</option>
+                                <option value="ศิลปะ">ศิลปะ</option>
+                                <option value="การงานอาชีพ">การงานอาชีพ</option>
+                                <option value="ภาษาต่างประเทศ">ภาษาต่างประเทศ</option>
+                                <option value="กิจกรรมพัฒนาผู้เรียน">กิจกรรมพัฒนาผู้เรียน</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ครูผู้ผลิตสื่อ</label>
+                            <select id="filter-teacher" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">ทั้งหมด</option>
+                                <!-- Teacher options will be loaded dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between mb-6">
+                        <button id="apply-filter" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
+                            </svg>
+                            กรองข้อมูล
+                        </button>
+                        <div class="space-x-2">
+                            <button id="export-excel" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3 17a1 1 0 001 1h12a1 1 0 001-1V7H3v10zM3 3a1 1 0 00-1 1v1h16V4a1 1 0 00-1-1H3z" clip-rule="evenodd" />
+                                </svg>
+                                ส่งออก Excel
+                            </button>
+                            <button id="print-report" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                                </svg>
+                                พิมพ์รายงาน
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead>
+                                <tr class="bg-blue-100">
+                                    <th class="py-2 px-4 border-b text-left">ลำดับ</th>
+                                    <th class="py-2 px-4 border-b text-left">วันที่ผลิตสื่อ</th>
+                                    <th class="py-2 px-4 border-b text-left">รายการสื่อ/นวัตกรรม</th>
+                                    <th class="py-2 px-4 border-b text-left">จำนวน</th>
+                                    <th class="py-2 px-4 border-b text-left">ครูผู้ผลิตสื่อ</th>
+                                    <th class="py-2 px-4 border-b text-left">กลุ่มสาระ</th>
+                                    <th class="py-2 px-4 border-b text-left">ไฟล์</th>
+                                    <th class="py-2 px-4 border-b text-left">หมายเหตุ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="filtered-media-list">
+                                <!-- Filtered data will be loaded here -->
+                                <tr>
+                                    <td colspan="8" class="py-4 text-center text-gray-500">กรุณาเลือกเงื่อนไขและกดปุ่มกรองข้อมูล</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white py-4 border-t">
+            <div class="container mx-auto px-4 text-center text-gray-600">
+                © 2025 ระบบทะเบียนสื่อ
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Global variables
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMpMXHLkBtpPIfGWKNdOkssSdmedsmxMkOD78O1i6DN3W2OpJrsi_Kcy8SdAW1piNiUw/exec';
+        const SHEET_ID = '1ENpsPu7yQHIsvT8fcfFe7Ro1-Glfx1exbJ0xj6qNPEE';
+        let allMediaData = [];
+        let teachersList = [];
+        
+        // Define subject order for consistent sorting
+        const subjectOrder = [
+            'ภาษาไทย',
+            'คณิตศาสตร์',
+            'วิทยาศาสตร์และเทคโนโลยี',
+            'สังคมศึกษา',
+            'สุขศึกษาและพลศึกษา',
+            'ศิลปะ',
+            'การงานอาชีพ',
+            'ภาษาต่างประเทศ',
+            'กิจกรรมพัฒนาผู้เรียน',
+            'อื่นๆ'
+        ];
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set current date
+            const now = new Date();
+            document.getElementById('current-date').textContent = now.toLocaleDateString('th-TH', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Navigation
+            const navItems = document.querySelectorAll('.nav-item');
+            const pageSections = document.querySelectorAll('.page-section');
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const target = this.getAttribute('data-target');
+                    
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show/hide sections
+                    pageSections.forEach(section => {
+                        if (section.id === target) {
+                            section.classList.remove('hidden');
+                        } else {
+                            section.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            // Form reset button
+            document.getElementById('reset-form').addEventListener('click', function() {
+                document.getElementById('media-form').reset();
+            });
+
+            // Form submission
+            document.getElementById('media-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitMediaForm();
+            });
+
+            // Export and filter buttons
+            document.getElementById('apply-filter').addEventListener('click', filterMediaData);
+            document.getElementById('export-excel').addEventListener('click', exportToExcel);
+            document.getElementById('print-report').addEventListener('click', printReport);
+
+            // Load data from Google Sheets
+            loadMediaData();
+        });
+
+        // Load media data from Google Sheets
+        function loadMediaData() {
+            // In a real application, this would fetch data from Google Sheets
+            // For this demo, we'll use localStorage to simulate persistence
+            const storedData = localStorage.getItem('mediaData');
+            
+            if (storedData) {
+                allMediaData = JSON.parse(storedData);
+                processMediaData();
+            } else {
+                // Initialize with sample data
+                const sampleData = generateSampleData();
+                localStorage.setItem('mediaData', JSON.stringify(sampleData));
+                allMediaData = sampleData;
+                processMediaData();
+            }
+
+            // In a real implementation, you would use fetch to get data from Google Sheets
+            // Example:
+            /*
+            fetch(`${SCRIPT_URL}?action=getData&sheetId=${SHEET_ID}`)
+                .then(response => response.json())
+                .then(data => {
+                    allMediaData = data;
+                    processMediaData();
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'เกิดข้อผิดพลาด',
+                        text: 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง'
+                    });
+                });
+            */
+        }
+
+        // Process and display media data
+        function processMediaData() {
+            updateDashboardStats();
+            updateDashboardCharts();
+            updateRecentMediaList();
+            updateTeachersList();
+        }
+
+        // Update dashboard statistics
+        function updateDashboardStats() {
+            document.getElementById('total-media').textContent = allMediaData.length;
+            
+            const currentYear = new Date().getFullYear();
+            const currentYearMedia = allMediaData.filter(item => {
+                const itemDate = new Date(item.date);
+                return itemDate.getFullYear() === currentYear;
+            });
+            document.getElementById('current-year-media').textContent = currentYearMedia.length;
+            
+            const uniqueSubjects = [...new Set(allMediaData.map(item => item.subject))];
+            document.getElementById('total-subjects').textContent = uniqueSubjects.length;
+            
+            const uniqueTeachers = [...new Set(allMediaData.map(item => item.teacher))];
+            document.getElementById('total-teachers').textContent = uniqueTeachers.length;
+        }
+
+        // Update dashboard charts
+        function updateDashboardCharts() {
+            // Monthly chart
+            const monthlyData = getMonthlyData();
+            const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+            new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: monthlyData.labels,
+                    datasets: [{
+                        label: 'จำนวนสื่อ',
+                        data: monthlyData.data,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Subjects chart
+            const subjectsData = getSubjectsData();
+            const subjectsCtx = document.getElementById('subjects-chart').getContext('2d');
+            new Chart(subjectsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: subjectsData.labels,
+                    datasets: [{
+                        data: subjectsData.data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(199, 199, 199, 0.7)',
+                            'rgba(83, 102, 255, 0.7)',
+                            'rgba(40, 159, 64, 0.7)',
+                            'rgba(210, 105, 30, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(199, 199, 199, 1)',
+                            'rgba(83, 102, 255, 1)',
+                            'rgba(40, 159, 64, 1)',
+                            'rgba(210, 105, 30, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Yearly chart
+            const yearlyData = getYearlyData();
+            const yearlyCtx = document.getElementById('yearly-chart').getContext('2d');
+            new Chart(yearlyCtx, {
+                type: 'pie',
+                data: {
+                    labels: yearlyData.labels,
+                    datasets: [{
+                        data: yearlyData.data,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Get monthly data for chart
+        function getMonthlyData() {
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            const currentYear = new Date().getFullYear();
+            const monthlyCounts = Array(12).fill(0);
+            
+            allMediaData.forEach(item => {
+                const itemDate = new Date(item.date);
+                if (itemDate.getFullYear() === currentYear) {
+                    monthlyCounts[itemDate.getMonth()]++;
+                }
+            });
+            
+            return {
+                labels: months,
+                data: monthlyCounts
+            };
+        }
+
+        // Get subjects data for chart
+        function getSubjectsData() {
+            const subjectCounts = {};
+            
+            allMediaData.forEach(item => {
+                if (subjectCounts[item.subject]) {
+                    subjectCounts[item.subject]++;
+                } else {
+                    subjectCounts[item.subject] = 1;
+                }
+            });
+            
+            // Sort subjects according to predefined order
+            const sortedSubjects = Object.keys(subjectCounts).sort((a, b) => {
+                return subjectOrder.indexOf(a) - subjectOrder.indexOf(b);
+            });
+            
+            return {
+                labels: sortedSubjects,
+                data: sortedSubjects.map(subject => subjectCounts[subject])
+            };
+        }
+
+        // Get yearly data for chart
+        function getYearlyData() {
+            const yearCounts = {};
+            
+            allMediaData.forEach(item => {
+                const year = new Date(item.date).getFullYear();
+                if (yearCounts[year]) {
+                    yearCounts[year]++;
+                } else {
+                    yearCounts[year] = 1;
+                }
+            });
+            
+            // Sort years in ascending order
+            const sortedYears = Object.keys(yearCounts).sort();
+            
+            return {
+                labels: sortedYears,
+                data: sortedYears.map(year => yearCounts[year])
+            };
+        }
+
+        // Update recent media list
+        function updateRecentMediaList() {
+            const recentMedia = [...allMediaData].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+            const tableBody = document.getElementById('recent-media-list');
+            
+            if (recentMedia.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-gray-500">ไม่พบข้อมูล</td></tr>';
+                return;
+            }
+            
+            tableBody.innerHTML = '';
+            recentMedia.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="py-2 px-4 border-b">${item.subject}-${getSubjectSequence(item.subject, item.id)}</td>
+                    <td class="py-2 px-4 border-b">${formatDate(item.date)}</td>
+                    <td class="py-2 px-4 border-b">${item.name}</td>
+                    <td class="py-2 px-4 border-b">${item.teacher}</td>
+                    <td class="py-2 px-4 border-b">${item.subject}</td>
+                    <td class="py-2 px-4 border-b">
+                        ${item.link ? `<a href="${item.link}" target="_blank" class="text-blue-600 hover:underline">ดูไฟล์</a>` : '-'}
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Update teachers list for filter dropdown
+        function updateTeachersList() {
+            teachersList = [...new Set(allMediaData.map(item => item.teacher))];
+            const teacherSelect = document.getElementById('filter-teacher');
+            
+            teacherSelect.innerHTML = '<option value="">ทั้งหมด</option>';
+            teachersList.forEach(teacher => {
+                const option = document.createElement('option');
+                option.value = teacher;
+                option.textContent = teacher;
+                teacherSelect.appendChild(option);
+            });
+        }
+
+        // Submit media form
+        function submitMediaForm() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            loadingIndicator.classList.remove('hidden');
+            
+            // Get form values
+            const mediaData = {
+                id: Date.now().toString(),
+                date: document.getElementById('media-date').value,
+                name: document.getElementById('media-name').value,
+                quantity: document.getElementById('media-quantity').value,
+                link: document.getElementById('media-link').value,
+                teacher: document.getElementById('media-teacher').value,
+                subject: document.getElementById('media-subject').value,
+                note: document.getElementById('media-note').value
+            };
+            
+            // Simulate API call to Google Sheets
+            setTimeout(() => {
+                // Add to local storage
+                allMediaData.push(mediaData);
+                localStorage.setItem('mediaData', JSON.stringify(allMediaData));
+                
+                // Update UI
+                processMediaData();
+                
+                // Hide loading indicator
+                loadingIndicator.classList.add('hidden');
+                
+                // Show success message
+                Swal.fire({
+                    icon: 'success',
+                    title: 'บันทึกข้อมูลสำเร็จ',
+                    text: 'ข้อมูลสื่อถูกบันทึกเรียบร้อยแล้ว'
+                });
+                
+                // Reset form
+                document.getElementById('media-form').reset();
+            }, 1500);
+            
+            // In a real implementation, you would use fetch to send data to Google Sheets
+            // Example:
+            /*
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addMedia',
+                    sheetId: SHEET_ID,
+                    data: mediaData
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add to local data
+                    allMediaData.push(mediaData);
+                    
+                    // Update UI
+                    processMediaData();
+                    
+                    // Show success message
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'บันทึกข้อมูลสำเร็จ',
+                        text: 'ข้อมูลสื่อถูกบันทึกเรียบร้อยแล้ว'
+                    });
+                    
+                    // Reset form
+                    document.getElementById('media-form').reset();
+                } else {
+                    throw new Error(data.message || 'Failed to save data');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving data:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง'
+                });
+            })
+            .finally(() => {
+                // Hide loading indicator
+                loadingIndicator.classList.add('hidden');
+            });
+            */
+        }
+
+        // Filter media data
+        function filterMediaData() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const subject = document.getElementById('filter-subject').value;
+            const teacher = document.getElementById('filter-teacher').value;
+            
+            let filteredData = [...allMediaData];
+            
+            if (startDate) {
+                filteredData = filteredData.filter(item => item.date >= startDate);
+            }
+            
+            if (endDate) {
+                filteredData = filteredData.filter(item => item.date <= endDate);
+            }
+            
+            if (subject) {
+                filteredData = filteredData.filter(item => item.subject === subject);
+            }
+            
+            if (teacher) {
+                filteredData = filteredData.filter(item => item.teacher === teacher);
+            }
+            
+            displayFilteredData(filteredData);
+        }
+
+        // Display filtered data
+        function displayFilteredData(filteredData) {
+            const tableBody = document.getElementById('filtered-media-list');
+            
+            if (filteredData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-gray-500">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
+                return;
+            }
+            
+            // Group data by subject
+            const groupedData = groupDataBySubject(filteredData);
+            
+            tableBody.innerHTML = '';
+            
+            // For each subject group
+            let overallIndex = 1;
+            groupedData.forEach(group => {
+                // Add subject header row
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'subject-header';
+                headerRow.innerHTML = `
+                    <td colspan="8" class="py-2 px-4 border-b bg-blue-50 text-blue-800">
+                        ${group.subject}
+                    </td>
+                `;
+                tableBody.appendChild(headerRow);
+                
+                // Add items for this subject
+                let subjectIndex = 1;
+                group.items.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = subjectIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                    
+                    row.innerHTML = `
+                        <td class="py-2 px-4 border-b">${group.subject}-${subjectIndex}</td>
+                        <td class="py-2 px-4 border-b">${formatDate(item.date)}</td>
+                        <td class="py-2 px-4 border-b">${item.name}</td>
+                        <td class="py-2 px-4 border-b">${item.quantity}</td>
+                        <td class="py-2 px-4 border-b">${item.teacher}</td>
+                        <td class="py-2 px-4 border-b">${item.subject}</td>
+                        <td class="py-2 px-4 border-b">
+                            ${item.link ? `<a href="${item.link}" target="_blank" class="text-blue-600 hover:underline">ดูไฟล์</a>` : '-'}
+                        </td>
+                        <td class="py-2 px-4 border-b">${item.note || '-'}</td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                    subjectIndex++;
+                    overallIndex++;
+                });
+            });
+        }
+
+        // Group data by subject and sort by subject order
+        function groupDataBySubject(data) {
+            // Group by subject
+            const groupedBySubject = {};
+            
+            data.forEach(item => {
+                if (!groupedBySubject[item.subject]) {
+                    groupedBySubject[item.subject] = [];
+                }
+                groupedBySubject[item.subject].push(item);
+            });
+            
+            // Sort items within each subject by date
+            Object.keys(groupedBySubject).forEach(subject => {
+                groupedBySubject[subject].sort((a, b) => new Date(a.date) - new Date(b.date));
+            });
+            
+            // Convert to array and sort by subject order
+            const result = Object.keys(groupedBySubject)
+                .sort((a, b) => {
+                    return subjectOrder.indexOf(a) - subjectOrder.indexOf(b);
+                })
+                .map(subject => ({
+                    subject: subject,
+                    items: groupedBySubject[subject]
+                }));
+            
+            return result;
+        }
+
+        // Get sequence number for a subject
+        function getSubjectSequence(subject, itemId) {
+            // Find all items with the same subject
+            const sameSubjectItems = allMediaData.filter(item => item.subject === subject);
+            
+            // Sort by date
+            sameSubjectItems.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // Find the index of the current item
+            const index = sameSubjectItems.findIndex(item => item.id === itemId);
+            
+            // Return 1-based index
+            return index + 1;
+        }
+
+        // Export to Excel
+        function exportToExcel() {
+            const filteredData = getFilteredData();
+            
+            if (filteredData.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ไม่พบข้อมูล',
+                    text: 'ไม่มีข้อมูลที่ตรงกับเงื่อนไขที่เลือก'
+                });
+                return;
+            }
+            
+            // Group data by subject
+            const groupedData = groupDataBySubject(filteredData);
+            
+            // Prepare data for Excel
+            const excelData = [
+                ['ลำดับ', 'วันที่ผลิตสื่อ', 'รายการสื่อ/นวัตกรรม', 'จำนวน', 'ครูผู้ผลิตสื่อ', 'กลุ่มสาระ', 'ไฟล์ลิงค์', 'หมายเหตุ']
+            ];
+            
+            groupedData.forEach(group => {
+                // Add subject header
+                excelData.push([group.subject, '', '', '', '', '', '', '']);
+                
+                // Add items for this subject
+                group.items.forEach((item, index) => {
+                    excelData.push([
+                        `${group.subject}-${index + 1}`,
+                        formatDate(item.date),
+                        item.name,
+                        item.quantity,
+                        item.teacher,
+                        item.subject,
+                        item.link || '',
+                        item.note || ''
+                    ]);
+                });
+                
+                // Add empty row after each group
+                excelData.push(['', '', '', '', '', '', '', '']);
+            });
+            
+            // Create worksheet
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'ทะเบียนสื่อ');
+            
+            // Generate Excel file
+            XLSX.writeFile(wb, 'ทะเบียนสื่อ.xlsx');
+        }
+
+        // Print report
+        function printReport() {
+            const filteredData = getFilteredData();
+            
+            if (filteredData.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ไม่พบข้อมูล',
+                    text: 'ไม่มีข้อมูลที่ตรงกับเงื่อนไขที่เลือก'
+                });
+                return;
+            }
+            
+            // Group data by subject
+            const groupedData = groupDataBySubject(filteredData);
+            
+            // Create PDF document
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Add title
+            doc.setFont('Sarabun', 'bold');
+            doc.setFontSize(18);
+            doc.text('รายงานทะเบียนสื่อ', 105, 15, { align: 'center' });
+            
+            // Add filter information
+            doc.setFontSize(12);
+            doc.setFont('Sarabun', 'normal');
+            
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const subject = document.getElementById('filter-subject').value;
+            const teacher = document.getElementById('filter-teacher').value;
+            
+            let filterText = 'เงื่อนไข: ';
+            if (startDate && endDate) {
+                filterText += `วันที่ ${formatDate(startDate)} ถึง ${formatDate(endDate)} `;
+            } else if (startDate) {
+                filterText += `ตั้งแต่วันที่ ${formatDate(startDate)} `;
+            } else if (endDate) {
+                filterText += `ถึงวันที่ ${formatDate(endDate)} `;
+            }
+            
+            if (subject) {
+                filterText += `กลุ่มสาระ: ${subject} `;
+            }
+            
+            if (teacher) {
+                filterText += `ครูผู้ผลิตสื่อ: ${teacher}`;
+            }
+            
+            doc.text(filterText, 14, 25);
+            
+            let yPosition = 30;
+            
+            // For each subject group
+            groupedData.forEach(group => {
+                // Add subject header
+                doc.setFont('Sarabun', 'bold');
+                doc.setFillColor(224, 231, 255); // Light blue background
+                doc.rect(14, yPosition, 182, 8, 'F');
+                doc.text(group.subject, 16, yPosition + 6);
+                yPosition += 10;
+                
+                // Create table for this subject
+                const tableData = group.items.map((item, index) => [
+                    `${group.subject}-${index + 1}`,
+                    formatDate(item.date),
+                    item.name,
+                    item.quantity,
+                    item.teacher,
+                    item.note || ''
+                ]);
+                
+                doc.autoTable({
+                    head: [['ลำดับ', 'วันที่ผลิตสื่อ', 'รายการสื่อ/นวัตกรรม', 'จำนวน', 'ครูผู้ผลิตสื่อ', 'หมายเหตุ']],
+                    body: tableData,
+                    startY: yPosition,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [59, 130, 246],
+                        textColor: 255,
+                        fontStyle: 'bold'
+                    },
+                    alternateRowStyles: {
+                        fillColor: [240, 245, 255]
+                    },
+                    margin: { left: 14, right: 14 }
+                });
+                
+                yPosition = doc.lastAutoTable.finalY + 10;
+                
+                // Add page if needed
+                if (yPosition > 270 && group !== groupedData[groupedData.length - 1]) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+            });
+            
+            // Add footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.text(`หน้า ${i} จาก ${pageCount}`, 105, doc.internal.pageSize.height - 10, { align: 'center' });
+            }
+            
+            // Save PDF
+            doc.save('รายงานทะเบียนสื่อ.pdf');
+        }
+
+        // Get filtered data based on current filter settings
+        function getFilteredData() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const subject = document.getElementById('filter-subject').value;
+            const teacher = document.getElementById('filter-teacher').value;
+            
+            let filteredData = [...allMediaData];
+            
+            if (startDate) {
+                filteredData = filteredData.filter(item => item.date >= startDate);
+            }
+            
+            if (endDate) {
+                filteredData = filteredData.filter(item => item.date <= endDate);
+            }
+            
+            if (subject) {
+                filteredData = filteredData.filter(item => item.subject === subject);
+            }
+            
+            if (teacher) {
+                filteredData = filteredData.filter(item => item.teacher === teacher);
+            }
+            
+            return filteredData;
+        }
+
+        // Format date to Thai format
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            
+            const date = new Date(dateString);
+            return date.toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        // Generate sample data for demo
+        function generateSampleData() {
+            const subjects = [
+                'ภาษาไทย',
+                'คณิตศาสตร์',
+                'วิทยาศาสตร์และเทคโนโลยี',
+                'สังคมศึกษา',
+                'สุขศึกษาและพลศึกษา',
+                'ศิลปะ',
+                'การงานอาชีพ',
+                'ภาษาต่างประเทศ'
+            ];
+            
+            const teachers = [
+                'ครูสมชาย ใจดี',
+                'ครูสมหญิง รักเรียน',
+                'ครูวิชัย สอนดี',
+                'ครูนภา มีความรู้',
+                'ครูพิชัย เก่งกล้า',
+                'ครูสุดา รักศิษย์'
+            ];
+            
+            const mediaNames = [
+                'สื่อการสอนเรื่องการอ่านจับใจความ',
+                'แบบจำลองระบบสุริยะ',
+                'สื่อการสอนคณิตศาสตร์เรื่องเศษส่วน',
+                'แผนที่ประเทศไทยแบบโต้ตอบ',
+                'สื่อการสอนภาษาอังกฤษเรื่อง Tenses',
+                'แบบจำลองร่างกายมนุษย์',
+                'สื่อการสอนเรื่องวงจรไฟฟ้า',
+                'แบบฝึกทักษะการเขียนเรียงความ',
+                'สื่อการสอนเรื่องอาหารและโภชนาการ',
+                'แบบจำลองภูมิประเทศ',
+                'สื่อการสอนเรื่องดนตรีไทย',
+                'แบบฝึกทักษะการคำนวณ'
+            ];
+            
+            const sampleData = [];
+            const currentYear = new Date().getFullYear();
+            const lastYear = currentYear - 1;
+            
+            // Generate data for last year
+            for (let i = 0; i < 15; i++) {
+                const month = Math.floor(Math.random() * 12);
+                const day = Math.floor(Math.random() * 28) + 1;
+                const date = new Date(lastYear, month, day);
+                const subject = subjects[Math.floor(Math.random() * subjects.length)];
+                
+                sampleData.push({
+                    id: `${lastYear}${i}`,
+                    date: date.toISOString().split('T')[0],
+                    name: mediaNames[Math.floor(Math.random() * mediaNames.length)],
+                    quantity: Math.floor(Math.random() * 5) + 1,
+                    link: Math.random() > 0.3 ? 'https://example.com/file' + i : '',
+                    teacher: teachers[Math.floor(Math.random() * teachers.length)],
+                    subject: subject,
+                    note: Math.random() > 0.7 ? 'หมายเหตุตัวอย่าง' : ''
+                });
+            }
+            
+            // Generate data for current year
+            for (let i = 0; i < 20; i++) {
+                const month = Math.floor(Math.random() * (new Date().getMonth() + 1));
+                const day = Math.floor(Math.random() * 28) + 1;
+                const date = new Date(currentYear, month, day);
+                const subject = subjects[Math.floor(Math.random() * subjects.length)];
+                
+                sampleData.push({
+                    id: `${currentYear}${i}`,
+                    date: date.toISOString().split('T')[0],
+                    name: mediaNames[Math.floor(Math.random() * mediaNames.length)],
+                    quantity: Math.floor(Math.random() * 5) + 1,
+                    link: Math.random() > 0.3 ? 'https://example.com/file' + i : '',
+                    teacher: teachers[Math.floor(Math.random() * teachers.length)],
+                    subject: subject,
+                    note: Math.random() > 0.7 ? 'หมายเหตุตัวอย่าง' : ''
+                });
+            }
+            
+            return sampleData;
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'968624074623f305',t:'MTc1NDA1OTc1MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
